@@ -1,11 +1,9 @@
 """ Transform AWS Transcribe json files to docx, csv, sqlite and vtt. """
 
 import json, datetime
-import statistics
 from pathlib import Path
 from time import perf_counter
 import pandas
-import sqlite3
 import webvtt
 import logging
 
@@ -33,48 +31,6 @@ def load_json_as_dict(filepath: str) -> dict:
 
     logging.debug("json checks psased")
     return data
-
-
-def calculate_confidence_statistics(data: dict) -> dict:
-    """Confidence Statistics"""
-    logging.info("Gathering confidence statistics")
-
-    # Stats dictionary
-    stats = {
-        "timestamps": [],
-        "accuracy": [],
-        "9.8": 0,
-        "9": 0,
-        "8": 0,
-        "7": 0,
-        "6": 0,
-        "5": 0,
-        "4": 0,
-        "3": 0,
-        "2": 0,
-        "1": 0,
-        "0": 0,
-        "total": len(data["results"]["items"]),
-    }
-
-    # Confidence count
-    for item in data["results"]["items"]:
-        if item["type"] == "pronunciation":
-
-            stats["timestamps"].append(float(item["start_time"]))
-
-            confidence_decimal = float(item["alternatives"][0]["confidence"])
-            confidence_integer = int(confidence_decimal * 100)
-
-            stats["accuracy"].append(confidence_integer)
-
-            if confidence_decimal >= 0.98:
-                stats["9.8"] += 1
-            else:
-                rough_confidence = str(int(confidence_decimal * 10))
-                stats[rough_confidence] += 1
-
-    return stats
 
 
 def decode_transcript_to_dataframe(data: str):
@@ -297,38 +253,15 @@ def write(transcript_filepath, **kwargs):
     dataframe = decode_transcript_to_dataframe(data)
 
     # Output
-    output_format = kwargs.get("format", "docx")
+    output_format = kwargs.get("format", "vtt")
 
     # Deprecated tmp_dir by improving save_as
     if kwargs.get("tmp_dir"):
         logging.warning("tmp_dir in kwargs")
         raise Exception("tmp_dir has been deprecated, use save_as instead")
 
-    # Output to docx (default behaviour)
-    if output_format == "docx":
-        output_filepath = kwargs.get(
-            "save_as", Path(transcript_filepath).with_suffix(".docx")
-        )
-        write_docx(data, output_filepath)
-
-    # Output to CSV
-    elif output_format == "csv":
-        output_filepath = kwargs.get(
-            "save_as", Path(transcript_filepath).with_suffix(".csv")
-        )
-        dataframe.to_csv(output_filepath)
-
-    # Output to sqlite
-    elif output_format == "sqlite":
-        output_filepath = kwargs.get(
-            "save_as", Path(transcript_filepath).with_suffix(".db")
-        )
-        conn = sqlite3.connect(str(output_filepath))
-        dataframe.to_sql("transcript", conn)
-        conn.close()
-
     # Output to VTT
-    elif output_format == "vtt":
+    if output_format == "vtt":
         output_filepath = kwargs.get(
             "save_as", Path(transcript_filepath).with_suffix(".vtt")
         )
